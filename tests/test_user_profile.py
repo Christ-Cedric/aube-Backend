@@ -1,6 +1,6 @@
 
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient, ASGIjosue_appport
 from app.main import app
 import uuid
 
@@ -12,7 +12,7 @@ async def test_user_profile_flow():
     email = f"profile_test_{uuid.uuid4()}@example.com"
     password = "password123"
     
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
         # 1. Signup
         signup_res = await ac.post("/v1/auth/signup", json={
             "email": email,

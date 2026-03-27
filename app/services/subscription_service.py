@@ -5,17 +5,42 @@ from app.core.database import get_database
 from app.core.config import settings
 from app.models.subscription import SubscriptionRequest, SubscriptionDB
 from app.utils.exceptions import ConflictError, NotFoundError
+from app.core.cache import cache
 import json
-import redis.asyncio as redis
 
 class SubscriptionService:
     def __init__(self, db):
         self.db = db
         self.collection = self.db.subscriptions
-        self.redis = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
         self.cache_ttl = 300  # 5 minutes for subscription status
 
-    async def create_subscription_request(self, request: SubscriptionRequest) -> SubscriptionDB:
+
+    async def create_subscription_request(self, user_id: uuid.UUID, request: SubscriptionRequest) -> SubscriptionDB:
+        # Check if device exists, if not, create it
+        device = await self.db.user_devices.find_one({"device_id": str(request.device_id)})
+        if not device:
+            new_device = {
+                "device_id": str(request.device_id),
+                "user_id": user_id,
+                "device_name": request.device_name,
+                "os_type": request.os_type,
+                "is_primary": False,
+                "is_active": True,
+                "created_at": datetime.now(timezone.utc),
+                "last_used": datetime.now(timezone.utc)
+            }
+            await self.db.user_devices.insert_one(new_device)
+        else:
+            # Update last used and info
+            await self.db.user_devices.update_one(
+                {"device_id": str(request.device_id)},
+                {"$set": {
+                    "last_used": datetime.now(timezone.utc),
+                    "device_name": request.device_name,
+                    "os_type": request.os_type
+                }}
+            )
+
         # Check for existing active subscription
         existing = await self.collection.find_one({
             "device_id": str(request.device_id),
@@ -27,7 +52,12 @@ class SubscriptionService:
         activation_key = f"ACT-{datetime.now(timezone.utc).year}-{secrets.token_hex(4).upper()}"
         
         subscription_data = {
+            "id": str(uuid.uuid4()),
+            "plan_name": request.plan_name,
+            "amount": request.amount,
+            "duration_days": request.duration_days,
             "device_id": str(request.device_id),
+            "user_id": str(user_id),
             "phone_number": request.phone_number,
             "months": request.months,
             "activation_key": activation_key,
@@ -50,12 +80,10 @@ class SubscriptionService:
             cache_key = f"subscription:key:{activation_key}"
 
         if cache_key:
-            try:
-                cached_data = await self.redis.get(cache_key)
-                if cached_data:
-                    return json.loads(cached_data)
-            except Exception:
-                pass
+            cached_data = await cache.get(cache_key)
+            if cached_data:
+                return json.loads(cached_data)
+
 
         query = {}
         if device_id:
@@ -77,10 +105,8 @@ class SubscriptionService:
             sub["status"] = "expired"
             # Invalidate cache
             if cache_key:
-                 try:
-                    await self.redis.delete(cache_key)
-                 except Exception:
-                    pass
+                await cache.delete(cache_key)
+
 
         remaining_days = 0
         if sub["status"] == "validated" and sub.get("expires_at"):
@@ -101,15 +127,14 @@ class SubscriptionService:
             result_to_cache['validated_at'] = result_to_cache['validated_at'].isoformat()
 
         if cache_key:
-            try:
-                await self.redis.setex(cache_key, self.cache_ttl, json.dumps(result_to_cache))
-            except Exception:
-                pass
+            await cache.setex(cache_key, self.cache_ttl, json.dumps(result_to_cache))
+
 
         return result
 
     async def close(self):
-        await self.redis.close()
+        pass  # No cleanup needed for in-memory cache
+
 
 async def get_subscription_service():
     db = await get_database()

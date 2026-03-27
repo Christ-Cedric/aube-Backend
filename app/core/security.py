@@ -23,14 +23,19 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    return pwd_context.hash(password[:72])
 
+from app.core.cache import cache
+import json
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 from app.models.user import User
+from app.schemas.user import TokenPayload
 from app.core.database import get_database
 from uuid import UUID
+
+from app.repositories.user_repository import UserRepository
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="v1/auth/login")
 
@@ -41,45 +46,34 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> User:
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
+        payload = jwt.decode(
+            token, 
+            settings.JWT_SECRET_KEY, 
+            algorithms=[settings.JWT_ALGORITHM]
+        )
+        token_data = TokenPayload(**payload)
+        if token_data.sub is None:
             raise credentials_exception
-    except JWTError:
+    except (JWTError, Exception):
         raise credentials_exception
         
-    # Try cache first
-    import redis.asyncio as redis
-    import json
-    r = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
-    try:
-        cached = await r.get(f"user:profile:{user_id}")
-        if cached:
-            return User(**json.loads(cached))
-    except Exception as e:
-        # Fallback to DB if redis fails
-        pass
+    user_id = token_data.sub
+    
+    # Try cache
+    cached = await cache.get(f"user:profile:{user_id}")
+    if cached:
+        return User(**json.loads(cached))
 
     db = await get_database()
-    user = await db.users.find_one({"id": user_id})
-    if user is None:
-        await r.close()
+    user_repo = UserRepository(db["users"])
+    user_data = await user_repo.get(user_id)
+    if user_data is None:
         raise credentials_exception
     
-    # helper to process datetime for json
-    user_data = dict(user)
-    if '_id' in user_data:
-        del user_data['_id'] # remove mongo id
+    user = User(**user_data.model_dump())
     
     # Store in cache
-    try:
-        # Use pydantic model dump which handles serialization better usually, but here we have dict from mongo
-        # User model handles conversions. Let's dump the User object.
-        user_obj = User(**user)
-        await r.setex(f"user:profile:{user_id}", 600, user_obj.model_dump_json())
-    except Exception:
-        pass
-    finally:
-        await r.close()
+    await cache.setex(f"user:profile:{user_id}", 600, user.model_dump_json())
         
-    return User(**user)
+    return user
+

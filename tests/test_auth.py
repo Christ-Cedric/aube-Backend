@@ -1,5 +1,5 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient, ASGIjosue_appport
 from app.main import app
 from app.core.database import db
 
@@ -12,7 +12,7 @@ async def clear_db():
 
 @pytest.mark.asyncio
 async def test_signup_successful():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
         response = await ac.post("/v1/auth/signup", json={
             "email": "test@example.com",
             "password": "password123",
@@ -26,7 +26,7 @@ async def test_signup_successful():
 
 @pytest.mark.asyncio
 async def test_signup_duplicate_email():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
         payload = {
             "email": "duplicate@example.com",
             "password": "password123",
@@ -41,7 +41,7 @@ async def test_signup_duplicate_email():
 @pytest.mark.asyncio
 async def test_login_successful():
     # First signup
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
         await ac.post("/v1/auth/signup", json={
             "email": "login@example.com",
             "password": "password123"
@@ -60,7 +60,7 @@ async def test_login_successful():
 
 @pytest.mark.asyncio
 async def test_login_invalid_credentials():
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
         response = await ac.post("/v1/auth/login", json={
             "email": "nonexistent@example.com",
             "password": "wrongpassword"

@@ -1,5 +1,5 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient, ASGIjosue_appport
 from app.main import app
 from fakeredis import aioredis as fakeredis
 import asyncio
@@ -23,7 +23,7 @@ async def test_rate_limiting_enforced():
     original_limit = config.settings.RATE_LIMIT_PER_MINUTE
     config.settings.RATE_LIMIT_PER_MINUTE = 5
     
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
         # Make requests up to the limit
         for i in range(5):
             response = await ac.get("/health")
@@ -47,7 +47,7 @@ async def test_rate_limit_resets_after_window():
     original_limit = config.settings.RATE_LIMIT_PER_MINUTE
     config.settings.RATE_LIMIT_PER_MINUTE = 2
     
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
         # Exhaust the limit
         await ac.get("/health")
         await ac.get("/health")

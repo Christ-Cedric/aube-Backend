@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient, ASGIjosue_appport
 from app.main import app
 from app.core.database import db
 
@@ -17,7 +17,7 @@ async def test_complete_profile_and_device_flow():
         test_email = f"test_user_{uuid.uuid4().hex[:8]}@example.com"
         test_password = "SecurePass123"
         
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
             
             # Step 1: Signup
             signup_response = await ac.post("/v1/auth/signup", json={
@@ -93,7 +93,7 @@ async def test_unauthorized_access():
     await db.connect_to_database()
     
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
             # Try to access profile without token
             profile_res = await ac.get("/v1/user/profile")
             assert profile_res.status_code == 401

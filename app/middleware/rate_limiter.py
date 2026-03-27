@@ -1,38 +1,47 @@
+import time
+import logging
+from collections import defaultdict
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-import redis.asyncio as redis
 from app.core.config import settings
-import time
+
+logger = logging.getLogger(__name__)
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
+    """In-memory rate limiter middleware"""
+    
     def __init__(self, app):
         super().__init__(app)
-        self.redis = redis.from_url(settings.REDIS_URL, encoding="utf-8", decode_responses=True)
+        self.requests = defaultdict(list)  # {identifier: [timestamps]}
+        logger.info("Rate limiter initialized (in-memory mode)")
 
     async def dispatch(self, request: Request, call_next):
-        # Determine identifier (IP or user ID if authenticated)
-        # For simplicity, using client IP. In production, consider X-Forwarded-For behind proxy.
-        identifier = request.client.host
-        
-        # Consider making rate limit configurable per endpoint or user role
-        key = f"rate_limit:app:{identifier}"
+        # Skip rate limiting for OPTIONS requests
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
+        identifier = request.client.host if request.client else "unknown"
         limit = settings.RATE_LIMIT_PER_MINUTE
+        window = 60  # seconds
         
-        # Check current usage
-        current = await self.redis.get(key)
-        if current and int(current) >= limit:
+        now = time.time()
+        
+        # Clean old requests outside the window
+        self.requests[identifier] = [
+            ts for ts in self.requests[identifier] 
+            if ts > now - window
+        ]
+        
+        # Check if limit exceeded
+        if len(self.requests[identifier]) >= limit:
             return JSONResponse(
                 status_code=429,
-                content={"detail": "Rate limit exceeded. Please try again later."}
+                content={"detail": "Too many requests. Please try again later."}
             )
-            
-        # Increment usage
-        pipe = self.redis.pipeline()
-        pipe.incr(key)
-        if not current:
-            # Set expiry for first request in window
-            pipe.expire(key, 60)
-        await pipe.execute()
+        
+        # Record this request
+        self.requests[identifier].append(now)
         
         return await call_next(request)
+

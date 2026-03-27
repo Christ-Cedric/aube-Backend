@@ -4,7 +4,7 @@ import os
 import uuid
 sys.path.append(os.getcwd())
 
-from httpx import AsyncClient, ASGITransport
+from httpx import AsyncClient, ASGIjosue_appport
 from app.main import app
 from app.core.database import db
 
@@ -18,7 +18,7 @@ def log(msg):
 async def main():
     await db.connect_to_database()
     try:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        async with AsyncClient(josue_appport=ASGIjosue_appport(app=app), base_url="http://test") as ac:
             email = "debug_user_v3@example.com"
             password = "password123"
             

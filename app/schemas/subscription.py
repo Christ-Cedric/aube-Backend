@@ -72,10 +72,14 @@ class SubscriptionResponse(BaseModel):
 # Alias pour compatibilité
 SubscriptionOut = SubscriptionResponse
 
-# Importer depuis models.device au lieu de redéfinir ici
-from app.models.device import DeviceCreate, DeviceDB
+# Schemas pour les devices (utilisés par user_service)
+class DeviceCreate(BaseModel):
+    device_id: UUID
+    device_name: str = "Unknown Device"
+    os_type: str = "Unknown"
+    fcm_token: Optional[str] = None
+    is_primary: bool = False
 
-# Créer DeviceOut pour l'API
 class DeviceOut(BaseModel):
     device_id: UUID
     user_id: UUID
@@ -85,7 +89,6 @@ class DeviceOut(BaseModel):
     is_active: bool
     created_at: datetime
     last_used: datetime
-    fcm_token: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
+
+class Config:
+        from_attributes = True    
