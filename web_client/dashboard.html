@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Backend - Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+
+<body>
+    <nav class="navbar">
+        <div class="brand">App Backend Client</div>
+        <div class="user-info">
+            <span id="navEmail">loading...</span>
+            <button onclick="logout()" class="btn-logout">Logout</button>
+        </div>
+    </nav>
+
+    <div class="dashboard-container">
+        <!-- Profile Section -->
+        <div class="card">
+            <h3>Profile</h3>
+            <div id="profileData">Loading...</div>
+        </div>
+
+        <!-- Devices Section -->
+        <div class="card">
+            <div class="card-header">
+                <h3>My Devices</h3>
+                <button onclick="showAddDevice()" class="btn-sm">Add Device</button>
+            </div>
+            <ul id="deviceList" class="device-list">
+                <!-- Devices injected here -->
+            </ul>
+        </div>
+
+        <!-- Subscriptions Section -->
+        <div class="card">
+            <h3>Subscription Status</h3>
+            <div id="subStatus">Checking...</div>
+            <div class="actions">
+                <input type="text" id="devIdRequest" placeholder="Device ID">
+                <button onclick="requestSub()" class="btn-sm">Request Sub</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Device Modal -->
+    <div id="deviceModal" class="modal hidden">
+        <div class="modal-content">
+            <h4>Add New Device</h4>
+            <input type="text" id="newDeviceName" placeholder="Device Name (e.g. Phone)">
+            <input type="text" id="newDeviceId" placeholder="Unique ID">
+            <input type="text" id="newDeviceType" placeholder="Type (android/ios)">
+            <div class="modal-actions">
+                <button onclick="closeDeviceModal()">Cancel</button>
+                <button onclick="addDevice()" class="btn-primary">Add</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        // Init dashboard on load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkAuth();
+            loadProfile();
+            loadDevices();
+        });
+    </script>
+</body>
+
+</html>
